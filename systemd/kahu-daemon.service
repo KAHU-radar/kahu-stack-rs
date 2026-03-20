@@ -2,8 +2,7 @@
 Description=KAHU vessel radar daemon
 Documentation=https://github.com/KAHU-radar/kahu-vessel-rs
 After=network-online.target mayara-server.service
-Wants=network-online.target
-Requires=mayara-server.service
+Wants=network-online.target mayara-server.service
 
 [Service]
 EnvironmentFile=/etc/default/kahu
