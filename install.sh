@@ -105,12 +105,18 @@ sudo install -m 755 /tmp/kahu-daemon "$INSTALL_DIR/kahu-daemon"
 info "  kahu-daemon → $INSTALL_DIR/kahu-daemon"
 
 # ── Download mayara-server ─────────────────────────────────────────────────────
-# Try the official mayara-server repo first; fall back to the bundled binary
-# in kahu-stack-rs releases while the owner's release pipeline is being set up.
+# Official releases are tarballs: mayara-server-vX.Y.Z-aarch64-unknown-linux-musl.tar.gz
 info "Downloading mayara-server..."
-if curl -fL "https://github.com/$MAYARA_REPO/releases/latest/download/mayara-server-aarch64-linux" \
-        -o /tmp/mayara-server 2>/dev/null; then
-    info "  Using official mayara-server release"
+MAYARA_TAG=$(curl -sf "https://api.github.com/repos/$MAYARA_REPO/releases/latest" \
+    | grep '"tag_name"' | cut -d'"' -f4 || true)
+if [[ -n "$MAYARA_TAG" ]]; then
+    MAYARA_TARBALL="mayara-server-${MAYARA_TAG}-aarch64-unknown-linux-musl.tar.gz"
+    curl -fL "https://github.com/$MAYARA_REPO/releases/latest/download/$MAYARA_TARBALL" \
+        -o /tmp/mayara-server.tar.gz \
+        || error "Could not download mayara-server $MAYARA_TAG"
+    tar -xzf /tmp/mayara-server.tar.gz -C /tmp mayara-server \
+        || error "Could not extract mayara-server from tarball"
+    info "  Using official mayara-server $MAYARA_TAG"
 else
     warn "Official mayara release not found — using bundled binary from kahu-stack-rs"
     curl -fL "https://github.com/$KAHU_STACK_RS_REPO/releases/latest/download/mayara-server-aarch64-linux" \
