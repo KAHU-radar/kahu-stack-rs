@@ -75,12 +75,9 @@ echo ""
 
 # ── Download kahu-daemon ───────────────────────────────────────────────────────
 info "Downloading kahu-daemon..."
-DAEMON_URL=$(curl -sf "https://api.github.com/repos/$KAHU_VESSEL_RS_REPO/releases/latest" \
-    | grep '"browser_download_url"' \
-    | grep 'kahu-daemon-aarch64-linux' \
-    | cut -d'"' -f4)
-[[ -n "$DAEMON_URL" ]] || error "Could not find kahu-daemon release. Check https://github.com/$KAHU_VESSEL_RS_REPO/releases"
-curl -fL "$DAEMON_URL" -o /tmp/kahu-daemon
+curl -fL "https://github.com/$KAHU_VESSEL_RS_REPO/releases/latest/download/kahu-daemon-aarch64-linux" \
+    -o /tmp/kahu-daemon \
+    || error "Could not download kahu-daemon. Check https://github.com/$KAHU_VESSEL_RS_REPO/releases"
 sudo install -m 755 /tmp/kahu-daemon "$INSTALL_DIR/kahu-daemon"
 info "  kahu-daemon → $INSTALL_DIR/kahu-daemon"
 
@@ -88,19 +85,15 @@ info "  kahu-daemon → $INSTALL_DIR/kahu-daemon"
 # Try the official mayara-server repo first; fall back to the bundled binary
 # in kahu-stack-rs releases while the owner's release pipeline is being set up.
 info "Downloading mayara-server..."
-MAYARA_URL=$(curl -sf "https://api.github.com/repos/$MAYARA_REPO/releases/latest" \
-    | grep '"browser_download_url"' \
-    | grep 'mayara-server-aarch64-linux' \
-    | cut -d'"' -f4 || true)
-if [[ -z "$MAYARA_URL" ]]; then
+if curl -fL "https://github.com/$MAYARA_REPO/releases/latest/download/mayara-server-aarch64-linux" \
+        -o /tmp/mayara-server 2>/dev/null; then
+    info "  Using official mayara-server release"
+else
     warn "Official mayara release not found — using bundled binary from kahu-stack-rs"
-    MAYARA_URL=$(curl -sf "https://api.github.com/repos/$KAHU_STACK_RS_REPO/releases/latest" \
-        | grep '"browser_download_url"' \
-        | grep 'mayara-server-aarch64-linux' \
-        | cut -d'"' -f4 || true)
+    curl -fL "https://github.com/$KAHU_STACK_RS_REPO/releases/latest/download/mayara-server-aarch64-linux" \
+        -o /tmp/mayara-server \
+        || error "Could not download mayara-server. Check https://github.com/$KAHU_STACK_RS_REPO/releases"
 fi
-[[ -n "$MAYARA_URL" ]] || error "Could not find mayara-server binary. Check https://github.com/$MAYARA_REPO/releases"
-curl -fL "$MAYARA_URL" -o /tmp/mayara-server
 sudo install -m 755 /tmp/mayara-server "$INSTALL_DIR/mayara-server"
 info "  mayara-server → $INSTALL_DIR/mayara-server"
 
