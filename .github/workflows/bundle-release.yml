@@ -1,0 +1,51 @@
+name: Bundle Release
+
+# Triggered manually to build and publish a new kahu-stack-rs release.
+# Builds mayara-server from source and bundles it alongside kahu-daemon.
+# Once the mayara owner publishes their own releases, this workflow can be retired.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release tag (e.g. v0.1.0)'
+        required: true
+        default: 'v0.1.0'
+
+permissions:
+  contents: write
+
+jobs:
+  build-mayara:
+    name: Build mayara-server aarch64 (musl)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout mayara-server
+        uses: actions/checkout@v4
+        with:
+          repository: MarineYachtRadar/mayara-server
+
+      - name: Install Rust nightly with aarch64-musl target
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          targets: aarch64-unknown-linux-musl
+
+      - name: Install cross
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cross
+
+      - name: Build
+        run: cross build --release --target aarch64-unknown-linux-musl
+
+      - name: Stage binary
+        run: cp target/aarch64-unknown-linux-musl/release/mayara-server mayara-server-aarch64-linux
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.version }}
+          name: ${{ github.event.inputs.version }}
+          files: mayara-server-aarch64-linux
+          generate_release_notes: false
