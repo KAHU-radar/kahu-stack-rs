@@ -112,10 +112,13 @@ sudo install -m 644 /tmp/kahu-daemon.service   "$SYSTEMD_DIR/kahu-daemon.service
 
 # ── Configure static IP on radar interface ─────────────────────────────────────
 # Navico/Halo radars don't run DHCP — the interface needs a static IP.
-# Done after all downloads so internet access is not disrupted.
+# Use ip addr add directly (no netplan apply) to avoid disrupting DNS/wlan0.
+# Also write a netplan file so the address persists across reboots.
 IFACE_HAS_IP=$(ip -4 addr show "$RADAR_INTERFACE" 2>/dev/null | grep -c 'inet ' || true)
 if [[ "$IFACE_HAS_IP" -eq 0 ]]; then
     info "Configuring static IP 192.168.0.100/24 on $RADAR_INTERFACE..."
+    sudo ip addr add 192.168.0.100/24 dev "$RADAR_INTERFACE" 2>/dev/null || true
+    sudo ip link set "$RADAR_INTERFACE" up
     NETPLAN_FILE="/etc/netplan/99-kahu-radar.yaml"
     sudo tee "$NETPLAN_FILE" > /dev/null <<EOF
 network:
@@ -126,9 +129,7 @@ network:
       dhcp4: false
 EOF
     sudo chmod 600 "$NETPLAN_FILE"
-    sudo netplan apply 2>/dev/null || true
-    sleep 2
-    info "  $RADAR_INTERFACE → 192.168.0.100/24"
+    info "  $RADAR_INTERFACE → 192.168.0.100/24 (persists after reboot)"
 else
     info "  $RADAR_INTERFACE already has an IP — skipping static config"
 fi
