@@ -5,7 +5,7 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-EnvironmentFile=/etc/default/kahu
+EnvironmentFile=-/etc/default/kahu
 ExecStart=/usr/local/bin/mayara-server --interface ${RADAR_INTERFACE} --brand navico
 Restart=on-failure
 RestartSec=5
