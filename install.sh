@@ -134,29 +134,10 @@ else
     info "  $RADAR_INTERFACE already has an IP — skipping static config"
 fi
 
-# ── Discover radar ID ──────────────────────────────────────────────────────────
-# Run mayara directly (not via systemd) so we can discover the radar ID before
-# writing the env file that the service depends on.
-info "Starting mayara-server to discover radar ID..."
-sudo RUST_MIN_STACK=8388608 "$INSTALL_DIR/mayara-server" \
-    --interface "$RADAR_INTERFACE" --brand navico &
-MAYARA_PID=$!
-sleep 8
-
-RADAR_ID=$(curl -sf "http://localhost:6502/signalk/v2/api/vessels/self/radars" 2>/dev/null \
-    | python3 -c "import sys,json; d=json.load(sys.stdin); print(next(iter(d)))" 2>/dev/null \
-    || true)
-
-sudo kill "$MAYARA_PID" 2>/dev/null || true
-wait "$MAYARA_PID" 2>/dev/null || true
-
-if [[ -n "$RADAR_ID" ]]; then
-    info "  Radar detected: $RADAR_ID"
-else
-    warn "  Could not auto-detect radar ID — defaulting to 'nav1034A'"
-    warn "  If your radar is not a HALO 034, edit RADAR_ID in $KAHU_ENV"
-    RADAR_ID="nav1034A"
-fi
+# ── Set radar ID ───────────────────────────────────────────────────────────────
+# Default to nav1034A (Navico HALO 034). Edit /etc/default/kahu to change.
+RADAR_ID="nav1034A"
+info "Radar ID: $RADAR_ID (edit $KAHU_ENV to change if needed)"
 
 # ── Write environment file ─────────────────────────────────────────────────────
 info "Writing $KAHU_ENV..."
