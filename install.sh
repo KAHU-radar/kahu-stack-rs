@@ -73,6 +73,29 @@ info "  Interface : $RADAR_INTERFACE"
 info "  API key   : ${API_KEY:0:8}..."
 echo ""
 
+# ── Configure static IP on radar interface ─────────────────────────────────────
+# Navico/Halo radars don't run DHCP — the interface needs a static IP.
+# We use 192.168.0.100/24, which is in the radar's default subnet.
+IFACE_HAS_IP=$(ip -4 addr show "$RADAR_INTERFACE" 2>/dev/null | grep -c 'inet ' || true)
+if [[ "$IFACE_HAS_IP" -eq 0 ]]; then
+    info "Configuring static IP 192.168.0.100/24 on $RADAR_INTERFACE..."
+    NETPLAN_FILE="/etc/netplan/99-kahu-radar.yaml"
+    sudo tee "$NETPLAN_FILE" > /dev/null <<EOF
+network:
+  version: 2
+  ethernets:
+    ${RADAR_INTERFACE}:
+      addresses: [192.168.0.100/24]
+      dhcp4: false
+EOF
+    sudo chmod 600 "$NETPLAN_FILE"
+    sudo netplan apply 2>/dev/null || true
+    sleep 2
+    info "  $RADAR_INTERFACE → 192.168.0.100/24"
+else
+    info "  $RADAR_INTERFACE already has an IP — skipping static config"
+fi
+
 # ── Download kahu-daemon ───────────────────────────────────────────────────────
 info "Downloading kahu-daemon..."
 curl -fL "https://github.com/$KAHU_VESSEL_RS_REPO/releases/latest/download/kahu-daemon-aarch64-linux" \
