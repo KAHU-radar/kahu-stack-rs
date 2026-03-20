@@ -10,7 +10,7 @@
 set -euo pipefail
 
 KAHU_VESSEL_RS_REPO="KAHU-radar/kahu-vessel-rs"
-KAHU_STACK_RS_REPO="KAHU-radar/kahu-stack-rs"
+MAYARA_REPO="MarineYachtRadar/mayara-server"
 INSTALL_DIR="/usr/local/bin"
 SYSTEMD_DIR="/etc/systemd/system"
 KAHU_ENV="/etc/default/kahu"
@@ -84,12 +84,14 @@ sudo install -m 755 /tmp/kahu-daemon "$INSTALL_DIR/kahu-daemon"
 info "  kahu-daemon → $INSTALL_DIR/kahu-daemon"
 
 # ── Download mayara-server ─────────────────────────────────────────────────────
+# Pulls the official musl aarch64 binary from the mayara-server repo.
+# Asset name is 'mayara-server-aarch64-linux' — update if the owner uses a different name.
 info "Downloading mayara-server..."
-MAYARA_URL=$(curl -sf "https://api.github.com/repos/$KAHU_STACK_RS_REPO/releases/latest" \
+MAYARA_URL=$(curl -sf "https://api.github.com/repos/$MAYARA_REPO/releases/latest" \
     | grep '"browser_download_url"' \
     | grep 'mayara-server-aarch64-linux' \
     | cut -d'"' -f4)
-[[ -n "$MAYARA_URL" ]] || error "Could not find mayara-server binary. Check https://github.com/$KAHU_STACK_RS_REPO/releases"
+[[ -n "$MAYARA_URL" ]] || error "Could not find mayara-server binary. Check https://github.com/$MAYARA_REPO/releases"
 curl -fL "$MAYARA_URL" -o /tmp/mayara-server
 sudo install -m 755 /tmp/mayara-server "$INSTALL_DIR/mayara-server"
 info "  mayara-server → $INSTALL_DIR/mayara-server"
