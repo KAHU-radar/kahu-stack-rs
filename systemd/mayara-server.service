@@ -1,0 +1,16 @@
+[Unit]
+Description=Mayara radar interface server
+Documentation=https://github.com/MarineYachtRadar/mayara-server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+EnvironmentFile=/etc/default/kahu
+ExecStart=/usr/local/bin/mayara-server --interface ${RADAR_INTERFACE} --brand navico
+Restart=on-failure
+RestartSec=5
+# Mayara needs an enlarged stack for its async runtime
+LimitSTACK=8388608
+
+[Install]
+WantedBy=multi-user.target
