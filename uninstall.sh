@@ -30,6 +30,6 @@ sudo rm -f /usr/local/bin/mayara-server
 info "Removing config..."
 sudo rm -f /etc/default/kahu
 sudo rm -f /etc/netplan/99-kahu-radar.yaml
-sudo netplan apply 2>/dev/null || true
+# Note: intentionally not running netplan apply — it can disrupt WiFi.
 
 info "Done. Logs are still available via: journalctl -u kahu-daemon"
