@@ -37,9 +37,8 @@ done
 
 # ── Load config ──────────────────────────────────────────────────────────────
 [[ -f "$KAHU_ENV" ]] || error "$KAHU_ENV not found — run install.sh first"
-# shellcheck source=/dev/null
-source "$KAHU_ENV"
-[[ -n "${KAHU_API_KEY:-}" ]] || error "KAHU_API_KEY not set in $KAHU_ENV"
+KAHU_API_KEY=$(grep -E '^KAHU_API_KEY=' "$KAHU_ENV" | cut -d= -f2-)
+[[ -n "$KAHU_API_KEY" ]] || error "KAHU_API_KEY not set in $KAHU_ENV"
 command -v tcpreplay >/dev/null || error "tcpreplay not installed (sudo apt-get install -y tcpreplay)"
 
 # ── Cleanup on exit / Ctrl-C ─────────────────────────────────────────────────
