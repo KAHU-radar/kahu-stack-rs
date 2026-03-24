@@ -10,7 +10,8 @@ ExecStart=/usr/local/bin/kahu-daemon \
     --ws-url ws://localhost:6502/signalk/v2/api/vessels/self/radars/${RADAR_ID}/spokes \
     --api-key ${KAHU_API_KEY} \
     --land-filter \
-    --spoke-timeout 60 \
+    --spoke-timeout ${SPOKE_TIMEOUT:-60} \
+    --min-fixes ${MIN_FIXES:-3} \
     --startup-delay 10
 Restart=on-failure
 RestartSec=10
