@@ -78,14 +78,12 @@ for i in $(seq 1 20); do
     sleep 1
 done
 
-# ── 2. First pcap pass — lets mayara discover the radar ──────────────────────
-# Mayara needs to see UDP packets on the loopback before it registers the
-# radar and opens the WebSocket spoke endpoint.  A single pass is enough.
-info "Pass 1: seeding radar discovery..."
-tcpreplay -t -i lo "$PCAP"
+# ── 2. Warm up radar — seed discovery before connecting the daemon ────────────
+# Mayara needs to see UDP packets before it registers the radar endpoint.
+tcpreplay -q -t -i lo "$PCAP" 2>/dev/null || tcpreplay -t -i lo "$PCAP"
 
 # Poll until mayara registers the radar (WebSocket endpoint becomes valid).
-info "Waiting for radar to be discovered..."
+info "Waiting for radar to come online..."
 for i in $(seq 1 20); do
     if curl -sf http://localhost:6502/signalk/v2/api/vessels/self/radars 2>/dev/null \
             | grep -q 'spokeDataUrl'; then
@@ -100,7 +98,7 @@ done
 
 # ── 3. Start kahu-daemon ─────────────────────────────────────────────────────
 info "Starting kahu-daemon..."
-RUST_LOG=warn /usr/local/bin/kahu-daemon \
+RUST_LOG=kahu_daemon=info /usr/local/bin/kahu-daemon \
     --ws-url "ws://localhost:6502/signalk/v2/api/vessels/self/radars/${RADAR_ID}/spokes" \
     --api-key "$KAHU_API_KEY" \
     --land-filter \
@@ -112,10 +110,10 @@ DAEMON_PID=$!
 info "Waiting for daemon to connect (3s)..."
 sleep 3
 
-# ── 4. Second pcap pass — actual data through the pipeline ───────────────────
-info "Pass 2: streaming radar data..."
-tcpreplay -t -i lo "$PCAP"
-info "Pcap complete — waiting ${SPOKE_TIMEOUT}s for tracks to flush and upload..."
+# ── 4. Stream radar data through the pipeline ─────────────────────────────────
+info "Streaming radar data..."
+tcpreplay -q -t -i lo "$PCAP" 2>/dev/null || tcpreplay -t -i lo "$PCAP"
+info "Data complete — waiting ${SPOKE_TIMEOUT}s for tracks to flush and upload..."
 
 # ── 5. Wait for spoke timeout + upload buffer ─────────────────────────────────
 sleep $((SPOKE_TIMEOUT + 10))
