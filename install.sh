@@ -107,6 +107,12 @@ curl -fL "https://github.com/$KAHU_STACK_RS_REPO/releases/latest/download/mayara
 sudo install -m 755 /tmp/mayara-server "$INSTALL_DIR/mayara-server"
 info "  mayara-server → $INSTALL_DIR/mayara-server"
 
+# ── Install demo script ────────────────────────────────────────────────────────
+info "Installing kahu-demo..."
+curl -fL "$RAW_BASE/kahu-demo.sh" -o /tmp/kahu-demo
+sudo install -m 755 /tmp/kahu-demo "$INSTALL_DIR/kahu-demo"
+info "  kahu-demo → $INSTALL_DIR/kahu-demo"
+
 # ── Install systemd services ───────────────────────────────────────────────────
 info "Installing systemd services..."
 curl -fL "$RAW_BASE/systemd/mayara-server.service" -o /tmp/mayara-server.service
@@ -202,21 +208,14 @@ info "Installation complete!"
 echo ""
 
 if [[ "$DEMO" == "true" ]]; then
-    echo "  Run the demo pipeline in order:"
+    echo "  Run the full demo with one command:"
     echo ""
-    echo "  1) Start the radar interface layer:"
-    echo "       sudo systemctl start mayara-server"
+    echo "       sudo kahu-demo --data $DEMO_PCAP_PATH"
     echo ""
-    echo "  2) Start replaying radar data:"
-    echo "       sudo tcpreplay -l 0 -i lo $DEMO_PCAP_PATH"
+    echo "  The script starts mayara, replays the pcap, streams kahu-daemon"
+    echo "  logs live, uploads tracks, then shuts everything down cleanly."
     echo ""
-    echo "  3) Start the daemon  (will wait 10 s for mayara to initialise):"
-    echo "       sudo systemctl start kahu-daemon"
-    echo ""
-    echo "  4) Watch the data flow:"
-    echo "       sudo journalctl -fu kahu-daemon"
-    echo ""
-    echo "  Tracks will appear at https://crowdsource.kahu.earth (~3-4 min)"
+    echo "  Tracks will appear at https://crowdsource.kahu.earth (~1-2 min)"
     echo ""
 else
     echo "  Status : sudo systemctl status mayara-server kahu-daemon"
