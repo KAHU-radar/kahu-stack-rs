@@ -99,7 +99,15 @@ for i in $(seq 1 20); do
     sleep 1
 done
 
-# ── 3. Start kahu-daemon ─────────────────────────────────────────────────────
+# ── 3. Re-seed GPS — full-speed pass immediately before starting daemon ───────
+# mayara resets its GPS state when the UDP stream restarts.  Running a fast
+# pass here ensures GPS is fresh when kahu-daemon connects, so every spoke in
+# the slow data replay has lat/lon embedded from the very first frame.
+# The daemon is NOT started yet, so this pass causes no WebSocket disruption.
+info "Re-seeding GPS position..."
+tcpreplay -t -i lo "$PCAP" > /dev/null 2>&1
+
+# ── 4. Start kahu-daemon ─────────────────────────────────────────────────────
 info "Starting kahu-daemon..."
 RUST_LOG=kahu_daemon=info /usr/local/bin/kahu-daemon \
     --ws-url "ws://localhost:6502/signalk/v2/api/vessels/self/radars/${RADAR_ID}/spokes" \
@@ -113,21 +121,13 @@ DAEMON_PID=$!
 info "Waiting for daemon to connect (3s)..."
 sleep 3
 
-# ── 4. Stream radar data through the pipeline ─────────────────────────────────
-# Pass 2a (full speed): re-seeds GPS in mayara immediately before the slow
-# replay.  mayara resets its GPS state when the UDP stream restarts, so the
-# NMEA from Pass 1 is stale by the time we reach here.  This mini-pass
-# ensures the position is fresh (< 100 ms old) when Pass 2b begins, so
-# kahu-daemon sees lat/lon in every spoke from the very first frame.
-info "Re-seeding GPS position..."
-tcpreplay -t -i lo "$PCAP" > /dev/null 2>&1
-
-# Pass 2b (slow): full spoke data at 1/5th speed (~30s).  GPS is now
-# already cached in mayara so kahu-daemon has valid position from spoke 1.
+# ── 5. Stream radar data through the pipeline ─────────────────────────────────
+# Slow replay: GPS is already cached in mayara so kahu-daemon has valid
+# position from spoke 1, giving the full ~30s window for track formation.
 info "Streaming radar data..."
 tcpreplay --multiplier 0.2 -i lo "$PCAP" > /dev/null 2>&1
 
-# ── 5. Wait for spoke timeout to fire, flush, and upload ──────────────────────
+# ── 6. Wait for spoke timeout to fire, flush, and upload ──────────────────────
 info "Data complete — waiting ${SPOKE_TIMEOUT}s for tracks to upload..."
 sleep $((SPOKE_TIMEOUT + 5))
 
