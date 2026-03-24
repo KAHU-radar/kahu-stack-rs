@@ -154,6 +154,7 @@ RADAR_ID=$RADAR_ID
 MAYARA_EXTRA_FLAGS=--replay --nmea0183 --navigation-address udp:0.0.0.0:10110
 SPOKE_TIMEOUT=15
 MIN_FIXES=1
+RUST_LOG=warn
 EOF
 else
     sudo tee "$KAHU_ENV" > /dev/null <<EOF
@@ -163,6 +164,7 @@ RADAR_ID=$RADAR_ID
 MAYARA_EXTRA_FLAGS=
 SPOKE_TIMEOUT=60
 MIN_FIXES=3
+RUST_LOG=warn
 EOF
 fi
 
