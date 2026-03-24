@@ -54,6 +54,11 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
+# ── Preflight: clear any stale processes from previous runs ──────────────────
+pkill -f mayara-server 2>/dev/null || true
+pkill -f kahu-daemon   2>/dev/null || true
+sleep 1
+
 # ── 1. Start mayara ──────────────────────────────────────────────────────────
 info "Starting mayara-server (logs → /tmp/mayara-demo.log)..."
 /usr/local/bin/mayara-server \
