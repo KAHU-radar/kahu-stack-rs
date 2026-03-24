@@ -44,12 +44,14 @@ command -v tcpreplay >/dev/null || error "tcpreplay not installed (sudo apt-get 
 # ── Cleanup on exit / Ctrl-C ─────────────────────────────────────────────────
 MAYARA_PID=""
 DAEMON_PID=""
+TCPREPLAY_PID=""
 cleanup() {
     echo ""
     info "Stopping..."
-    [[ -n "$DAEMON_PID" ]] && kill -INT "$DAEMON_PID" 2>/dev/null || true
-    [[ -n "$MAYARA_PID" ]] && kill      "$MAYARA_PID" 2>/dev/null || true
-    [[ -n "$DAEMON_PID" ]] && wait      "$DAEMON_PID" 2>/dev/null || true
+    [[ -n "$TCPREPLAY_PID" ]] && kill      "$TCPREPLAY_PID" 2>/dev/null || true
+    [[ -n "$DAEMON_PID"    ]] && kill -INT "$DAEMON_PID"    2>/dev/null || true
+    [[ -n "$MAYARA_PID"    ]] && kill      "$MAYARA_PID"    2>/dev/null || true
+    [[ -n "$DAEMON_PID"    ]] && wait      "$DAEMON_PID"    2>/dev/null || true
     info "Done."
 }
 trap cleanup EXIT INT TERM
@@ -80,7 +82,7 @@ done
 
 # ── 2. Warm up radar — seed discovery before connecting the daemon ────────────
 # Mayara needs to see UDP packets before it registers the radar endpoint.
-tcpreplay -q -t -i lo "$PCAP" 2>/dev/null || tcpreplay -t -i lo "$PCAP"
+tcpreplay -t -i lo "$PCAP" > /dev/null 2>&1
 
 # Poll until mayara registers the radar (WebSocket endpoint becomes valid).
 info "Waiting for radar to come online..."
@@ -111,12 +113,18 @@ info "Waiting for daemon to connect (3s)..."
 sleep 3
 
 # ── 4. Stream radar data through the pipeline ─────────────────────────────────
+# Loop the pcap so data keeps flowing after the daemon's 5s reconnect delay.
+# 30s gives ~12 full radar sweeps — enough for tracks to form and complete.
 info "Streaming radar data..."
-tcpreplay -q -t -i lo "$PCAP" 2>/dev/null || tcpreplay -t -i lo "$PCAP"
-info "Data complete — waiting ${SPOKE_TIMEOUT}s for tracks to flush and upload..."
+tcpreplay -l 0 -i lo "$PCAP" > /dev/null 2>&1 &
+TCPREPLAY_PID=$!
+sleep 30
+kill "$TCPREPLAY_PID" 2>/dev/null || true
+TCPREPLAY_PID=""
 
-# ── 5. Wait for spoke timeout + upload buffer ─────────────────────────────────
-sleep $((SPOKE_TIMEOUT + 10))
+# ── 5. Wait for spoke timeout to fire, flush, and upload ──────────────────────
+info "Data complete — waiting ${SPOKE_TIMEOUT}s for tracks to upload..."
+sleep $((SPOKE_TIMEOUT + 5))
 
 info "Tracks uploaded — shutting down"
 # cleanup trap fires here
