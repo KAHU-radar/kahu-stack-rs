@@ -13,7 +13,7 @@ set -euo pipefail
 
 KAHU_ENV="/etc/default/kahu"
 SPOKE_TIMEOUT=15
-MIN_FIXES=1
+MIN_FIXES=2
 RADAR_ID="${RADAR_ID:-nav1034A}"
 PCAP=""
 
