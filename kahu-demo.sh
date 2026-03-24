@@ -48,8 +48,9 @@ cleanup() {
     echo ""
     info "Stopping..."
     [[ -n "$DAEMON_PID" ]] && kill -INT "$DAEMON_PID" 2>/dev/null || true
-    [[ -n "$MAYARA_PID" ]] && kill      "$MAYARA_PID" 2>/dev/null || true
+    sleep 2
     [[ -n "$DAEMON_PID" ]] && kill -9   "$DAEMON_PID" 2>/dev/null || true
+    [[ -n "$MAYARA_PID" ]] && kill -9   "$MAYARA_PID" 2>/dev/null || true
     info "Done."
 }
 trap cleanup EXIT INT TERM
