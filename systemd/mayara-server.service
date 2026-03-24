@@ -9,11 +9,10 @@ EnvironmentFile=-/etc/default/kahu
 # $MAYARA_EXTRA_FLAGS is empty in production; set in /etc/default/kahu for demo/replay mode.
 # The shell wrapper is intentional — unquoted $MAYARA_EXTRA_FLAGS word-splits correctly
 # when it contains multiple flags, and produces no argument at all when empty.
+Environment=RUST_MIN_STACK=8388608
 ExecStart=/bin/sh -c 'exec /usr/local/bin/mayara-server --interface "$RADAR_INTERFACE" --brand navico $MAYARA_EXTRA_FLAGS'
 Restart=on-failure
 RestartSec=5
-# Mayara needs an enlarged stack for its async runtime
-LimitSTACK=8388608
 
 [Install]
 WantedBy=multi-user.target
