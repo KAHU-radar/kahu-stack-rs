@@ -79,8 +79,10 @@ for i in $(seq 1 20); do
     sleep 1
 done
 
-# ── 2. Warm up radar — seed discovery before connecting the daemon ────────────
-# Mayara needs to see UDP packets before it registers the radar endpoint.
+# ── 2. Warm up radar — seed discovery AND GPS position before connecting daemon
+# Pass 1 (full speed): seeds radar UDP discovery and delivers NMEA/GPS data.
+# The NMEA sentence is ~4-5 s into the pcap; at full speed this arrives almost
+# immediately, so mayara caches the vessel position before Pass 2 begins.
 tcpreplay -t -i lo "$PCAP" > /dev/null 2>&1
 
 # Poll until mayara registers the radar (WebSocket endpoint becomes valid).
@@ -93,6 +95,25 @@ for i in $(seq 1 20); do
     fi
     if ! kill -0 "$MAYARA_PID" 2>/dev/null; then
         error "mayara crashed — check /tmp/mayara-demo.log"
+    fi
+    sleep 1
+done
+
+# Poll until mayara has a GPS fix (navigation/position returns a latitude).
+# Without this, kahu-daemon skips every spoke until own_pos is set, wasting
+# the first ~24s of the slow Pass 2 replay window.
+info "Waiting for GPS position..."
+for i in $(seq 1 30); do
+    if curl -sf http://localhost:6502/signalk/v2/api/vessels/self/navigation/position \
+            2>/dev/null | grep -q '"latitude"'; then
+        info "GPS position confirmed"
+        break
+    fi
+    if ! kill -0 "$MAYARA_PID" 2>/dev/null; then
+        error "mayara crashed — check /tmp/mayara-demo.log"
+    fi
+    if [[ $i -eq 30 ]]; then
+        warn "GPS position not confirmed after 30s — proceeding anyway"
     fi
     sleep 1
 done
