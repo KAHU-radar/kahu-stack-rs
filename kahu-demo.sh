@@ -99,25 +99,6 @@ for i in $(seq 1 20); do
     sleep 1
 done
 
-# Poll until mayara has a GPS fix (navigation/position returns a latitude).
-# Without this, kahu-daemon skips every spoke until own_pos is set, wasting
-# the first ~24s of the slow Pass 2 replay window.
-info "Waiting for GPS position..."
-for i in $(seq 1 30); do
-    if curl -sf http://localhost:6502/signalk/v2/api/vessels/self/navigation/position \
-            2>/dev/null | grep -q '"latitude"'; then
-        info "GPS position confirmed"
-        break
-    fi
-    if ! kill -0 "$MAYARA_PID" 2>/dev/null; then
-        error "mayara crashed — check /tmp/mayara-demo.log"
-    fi
-    if [[ $i -eq 30 ]]; then
-        warn "GPS position not confirmed after 30s — proceeding anyway"
-    fi
-    sleep 1
-done
-
 # ── 3. Start kahu-daemon ─────────────────────────────────────────────────────
 info "Starting kahu-daemon..."
 RUST_LOG=kahu_daemon=info /usr/local/bin/kahu-daemon \
@@ -133,8 +114,16 @@ info "Waiting for daemon to connect (3s)..."
 sleep 3
 
 # ── 4. Stream radar data through the pipeline ─────────────────────────────────
-# Replay at 1/5th speed (~30s).  The daemon drops and reconnects in ~5s;
-# at this rate ~25s of spoke data remains — enough for tracks to form.
+# Pass 2a (full speed): re-seeds GPS in mayara immediately before the slow
+# replay.  mayara resets its GPS state when the UDP stream restarts, so the
+# NMEA from Pass 1 is stale by the time we reach here.  This mini-pass
+# ensures the position is fresh (< 100 ms old) when Pass 2b begins, so
+# kahu-daemon sees lat/lon in every spoke from the very first frame.
+info "Re-seeding GPS position..."
+tcpreplay -t -i lo "$PCAP" > /dev/null 2>&1
+
+# Pass 2b (slow): full spoke data at 1/5th speed (~30s).  GPS is now
+# already cached in mayara so kahu-daemon has valid position from spoke 1.
 info "Streaming radar data..."
 tcpreplay --multiplier 0.2 -i lo "$PCAP" > /dev/null 2>&1
 
