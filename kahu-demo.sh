@@ -44,13 +44,15 @@ command -v tcpreplay >/dev/null || error "tcpreplay not installed (sudo apt-get 
 # ── Cleanup on exit / Ctrl-C ─────────────────────────────────────────────────
 MAYARA_PID=""
 DAEMON_PID=""
+TCPREPLAY_PID=""
 cleanup() {
     echo ""
     info "Stopping..."
-    [[ -n "$DAEMON_PID" ]] && kill -INT "$DAEMON_PID" 2>/dev/null || true
+    [[ -n "$TCPREPLAY_PID" ]] && kill    "$TCPREPLAY_PID" 2>/dev/null || true
+    [[ -n "$DAEMON_PID"    ]] && kill -INT "$DAEMON_PID"  2>/dev/null || true
     sleep 2
-    [[ -n "$DAEMON_PID" ]] && kill -9   "$DAEMON_PID" 2>/dev/null || true
-    [[ -n "$MAYARA_PID" ]] && kill -9   "$MAYARA_PID" 2>/dev/null || true
+    [[ -n "$DAEMON_PID"    ]] && kill -9   "$DAEMON_PID"  2>/dev/null || true
+    [[ -n "$MAYARA_PID"    ]] && kill -9   "$MAYARA_PID"  2>/dev/null || true
     info "Done."
 }
 trap cleanup EXIT INT TERM
@@ -112,11 +114,16 @@ info "Waiting for daemon to connect (3s)..."
 sleep 3
 
 # ── 4. Stream radar data through the pipeline ─────────────────────────────────
-# Replay at 1/5th speed so the pcap takes ~30s.  The daemon drops and
-# reconnects in 5s; at this rate ~25s of spoke data remains — enough for
-# tracks to form across multiple radar sweeps.
-info "Streaming radar data..."
-tcpreplay --multiplier 0.2 -i lo "$PCAP" > /dev/null 2>&1
+# Loop the pcap at 1/5th speed for 90 s (~9 radar sweeps).  More sweeps
+# mean longer, cleaner tracks and more features visible on the map.
+# The daemon drops and reconnects once in ~5 s; looping ensures data is
+# still flowing when it comes back up.
+info "Streaming radar data (90s)..."
+tcpreplay -l 0 --multiplier 0.2 -i lo "$PCAP" > /dev/null 2>&1 &
+TCPREPLAY_PID=$!
+sleep 90
+kill "$TCPREPLAY_PID" 2>/dev/null || true
+TCPREPLAY_PID=""
 
 # ── 5. Wait for spoke timeout to fire, flush, and upload ──────────────────────
 info "Data complete — waiting ${SPOKE_TIMEOUT}s for tracks to upload..."
