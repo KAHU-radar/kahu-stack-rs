@@ -3,7 +3,11 @@
 #
 # Usage (run as root or with sudo):
 #   sudo kahu-demo --data halo_and_0183.pcap
-#   sudo kahu-demo --data /path/to/halo_and_0183.pcap
+#   sudo kahu-demo --data halo_and_0183.pcap --loops 3
+#
+# --loops N  replay the pcap N times (default 1).  More loops give the land
+#            filter more data to warm up on (suppresses dikes/coastlines) and
+#            produce longer, cleaner vessel tracks.  Each loop is ~30s.
 #
 # Download pcap:
 #   curl -fL https://raw.githubusercontent.com/MarineYachtRadar/mayara-server/main/demo/samples/halo_and_0183.pcap \
@@ -14,6 +18,7 @@ set -euo pipefail
 KAHU_ENV="/etc/default/kahu"
 SPOKE_TIMEOUT=15
 MIN_FIXES=2
+LOOPS=1
 RADAR_ID="${RADAR_ID:-nav1034A}"
 PCAP=""
 
@@ -25,7 +30,8 @@ error() { echo -e "${RED}[demo]${NC} $*" >&2; exit 1; }
 # ── Parse arguments ──────────────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --data) PCAP="$2"; shift 2 ;;
+        --data)  PCAP="$2";  shift 2 ;;
+        --loops) LOOPS="$2"; shift 2 ;;
         *) error "Unknown argument: $1" ;;
     esac
 done
@@ -122,10 +128,17 @@ info "Waiting for daemon to connect (3s)..."
 sleep 3
 
 # ── 5. Stream radar data through the pipeline ─────────────────────────────────
-# Slow replay: GPS is already cached in mayara so kahu-daemon has valid
-# position from spoke 1, giving the full ~30s window for track formation.
-info "Streaming radar data..."
-tcpreplay --multiplier 0.2 -i lo "$PCAP" > /dev/null 2>&1
+# Loops run back-to-back with no gap, so the daemon stays connected and the
+# land filter accumulates sweeps across all loops.  More loops = better dike
+# suppression and longer vessel tracks.
+for loop in $(seq 1 "$LOOPS"); do
+    if [[ "$LOOPS" -gt 1 ]]; then
+        info "Streaming radar data (loop $loop/$LOOPS)..."
+    else
+        info "Streaming radar data..."
+    fi
+    tcpreplay --multiplier 0.2 -i lo "$PCAP" > /dev/null 2>&1
+done
 
 # ── 6. Wait for spoke timeout to fire, flush, and upload ──────────────────────
 info "Data complete — waiting ${SPOKE_TIMEOUT}s for tracks to upload..."
