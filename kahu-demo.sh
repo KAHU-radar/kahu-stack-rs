@@ -56,16 +56,15 @@ trap cleanup EXIT INT TERM
 
 # ── 1. Start mayara ──────────────────────────────────────────────────────────
 info "Starting mayara-server (logs → /tmp/mayara-demo.log)..."
-RUST_MIN_STACK=8388608 /usr/local/bin/mayara-server \
+/usr/local/bin/mayara-server \
     --interface lo --brand navico \
     --replay --nmea0183 --navigation-address udp:0.0.0.0:10110 \
     > /tmp/mayara-demo.log 2>&1 &
 MAYARA_PID=$!
 
-info "Waiting for mayara WebSocket..."
+info "Waiting for mayara to start..."
 for i in $(seq 1 20); do
     if curl -s --max-time 1 -o /dev/null http://localhost:6502/ 2>/dev/null; then
-        info "mayara ready"
         break
     fi
     if ! kill -0 "$MAYARA_PID" 2>/dev/null; then
@@ -74,7 +73,27 @@ for i in $(seq 1 20); do
     sleep 1
 done
 
-# ── 2. Start kahu-daemon ─────────────────────────────────────────────────────
+# ── 2. First pcap pass — lets mayara discover the radar ──────────────────────
+# Mayara needs to see UDP packets on the loopback before it registers the
+# radar and opens the WebSocket spoke endpoint.  A single pass is enough.
+info "Pass 1: seeding radar discovery..."
+tcpreplay -t -i lo "$PCAP"
+
+# Poll until mayara registers the radar (WebSocket endpoint becomes valid).
+info "Waiting for radar to be discovered..."
+for i in $(seq 1 20); do
+    if curl -sf http://localhost:6502/signalk/v2/api/vessels/self/radars 2>/dev/null \
+            | grep -q 'spokeDataUrl'; then
+        info "Radar online"
+        break
+    fi
+    if ! kill -0 "$MAYARA_PID" 2>/dev/null; then
+        error "mayara crashed — check /tmp/mayara-demo.log"
+    fi
+    sleep 1
+done
+
+# ── 3. Start kahu-daemon ─────────────────────────────────────────────────────
 info "Starting kahu-daemon..."
 RUST_LOG=warn /usr/local/bin/kahu-daemon \
     --ws-url "ws://localhost:6502/signalk/v2/api/vessels/self/radars/${RADAR_ID}/spokes" \
@@ -85,15 +104,15 @@ RUST_LOG=warn /usr/local/bin/kahu-daemon \
     --startup-delay 0 &
 DAEMON_PID=$!
 
-info "Waiting for daemon to connect to mayara (3s)..."
+info "Waiting for daemon to connect (3s)..."
 sleep 3
 
-# ── 3. Replay pcap ───────────────────────────────────────────────────────────
-info "Replaying $PCAP..."
+# ── 4. Second pcap pass — actual data through the pipeline ───────────────────
+info "Pass 2: streaming radar data..."
 tcpreplay -t -i lo "$PCAP"
 info "Pcap complete — waiting ${SPOKE_TIMEOUT}s for tracks to flush and upload..."
 
-# ── 4. Wait for spoke timeout + upload buffer ─────────────────────────────────
+# ── 5. Wait for spoke timeout + upload buffer ─────────────────────────────────
 sleep $((SPOKE_TIMEOUT + 10))
 
 info "Tracks uploaded — shutting down"
