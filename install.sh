@@ -121,29 +121,32 @@ sudo install -m 644 /tmp/mayara-server.service "$SYSTEMD_DIR/mayara-server.servi
 sudo install -m 644 /tmp/kahu-daemon.service   "$SYSTEMD_DIR/kahu-daemon.service"
 
 # ── Static IP on radar interface (production only) ─────────────────────────────
-# Navico/Halo radars don't run DHCP — the interface needs a static IP.
-# Skipped in demo mode since loopback already has 127.0.0.1.
-if [[ "$DEMO" == "false" ]]; then
-    IFACE_HAS_IP=$(ip -4 addr show "$RADAR_INTERFACE" 2>/dev/null | grep -c 'inet ' || true)
-    if [[ "$IFACE_HAS_IP" -eq 0 ]]; then
-        info "Configuring static IP 192.168.0.100/24 on $RADAR_INTERFACE..."
-        sudo ip addr add 192.168.0.100/24 dev "$RADAR_INTERFACE" 2>/dev/null || true
-        sudo ip link set "$RADAR_INTERFACE" up
-        NETPLAN_FILE="/etc/netplan/99-kahu-radar.yaml"
-        sudo tee "$NETPLAN_FILE" > /dev/null <<EOF
-network:
-  version: 2
-  ethernets:
-    ${RADAR_INTERFACE}:
-      addresses: [192.168.0.100/24]
-      dhcp4: false
-EOF
-        sudo chmod 600 "$NETPLAN_FILE"
-        info "  $RADAR_INTERFACE → 192.168.0.100/24 (persists after reboot)"
-    else
-        info "  $RADAR_INTERFACE already has an IP — skipping static config"
-    fi
-fi
+# Navico/Halo radars use subnet 192.168.0.x.  Uncomment to have the installer
+# configure the interface automatically.  If the interface already has an IP
+# (e.g. your Pi has a direct-link address for SSH), this will add a second
+# address rather than replace it — verify with `ip addr show $RADAR_INTERFACE`.
+#
+# if [[ "$DEMO" == "false" ]]; then
+#     IFACE_HAS_IP=$(ip -4 addr show "$RADAR_INTERFACE" 2>/dev/null | grep -c 'inet ' || true)
+#     if [[ "$IFACE_HAS_IP" -eq 0 ]]; then
+#         info "Configuring static IP 192.168.0.100/24 on $RADAR_INTERFACE..."
+#         sudo ip addr add 192.168.0.100/24 dev "$RADAR_INTERFACE" 2>/dev/null || true
+#         sudo ip link set "$RADAR_INTERFACE" up
+#         NETPLAN_FILE="/etc/netplan/99-kahu-radar.yaml"
+#         sudo tee "$NETPLAN_FILE" > /dev/null <<NETPLAN
+# network:
+#   version: 2
+#   ethernets:
+#     ${RADAR_INTERFACE}:
+#       addresses: [192.168.0.100/24]
+#       dhcp4: false
+# NETPLAN
+#         sudo chmod 600 "$NETPLAN_FILE"
+#         info "  $RADAR_INTERFACE → 192.168.0.100/24 (persists after reboot)"
+#     else
+#         info "  $RADAR_INTERFACE already has an IP — skipping static config"
+#     fi
+# fi
 
 # ── Set radar ID ───────────────────────────────────────────────────────────────
 # Default to nav1034A (Navico HALO 034). Edit /etc/default/kahu to change.
@@ -221,6 +224,11 @@ else
     echo "  Status : sudo systemctl status mayara-server kahu-daemon"
     echo "  Logs   : sudo journalctl -fu kahu-daemon"
     echo "  Config : $KAHU_ENV"
+    echo ""
+    echo "  Network: Navico/Halo radars use subnet 192.168.0.x."
+    echo "  Ensure $RADAR_INTERFACE has a static IP on that subnet, e.g.:"
+    echo "    sudo ip addr add 192.168.0.100/24 dev $RADAR_INTERFACE"
+    echo "  To persist across reboots, add it to /etc/netplan/."
     echo ""
     echo "  Vessel tracks will appear at https://crowdsource.kahu.earth"
     echo ""
