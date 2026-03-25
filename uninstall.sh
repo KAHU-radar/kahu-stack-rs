@@ -26,6 +26,11 @@ sudo systemctl daemon-reload
 info "Removing binaries..."
 sudo rm -f /usr/local/bin/kahu-daemon
 sudo rm -f /usr/local/bin/mayara-server
+sudo rm -f /usr/local/bin/kahu-demo
+
+info "Cleaning up /tmp install artifacts..."
+sudo rm -f /tmp/kahu-daemon /tmp/mayara-server /tmp/kahu-daemon.service /tmp/mayara-server.service
+sudo rm -rf /tmp/kahu-demo
 
 info "Removing config..."
 sudo rm -f /etc/default/kahu
